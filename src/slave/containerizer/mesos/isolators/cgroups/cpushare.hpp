@@ -30,8 +30,8 @@
 #include "slave/flags.hpp"
 
 #include "slave/containerizer/mesos/isolator.hpp"
-
 #include "slave/containerizer/mesos/isolators/cgroups/constants.hpp"
+#include "slave/containerizer/mesos/isolators/cgroups/devices/hwloc/hwloc.hpp"
 
 namespace mesos {
 namespace internal {
@@ -109,7 +109,13 @@ private:
 
   // TODO(bmahler): Use Owned<Info>.
   hashmap<ContainerID, Info*> infos;
+
+  TopologyResourceInformation coreManager;
+
+  Try<bool> pinCores(const Info* info);
+  Try<bool> unpinCores(const Info* info);
 };
+
 
 } // namespace slave {
 } // namespace internal {

@@ -38,6 +38,9 @@
 
 #include "slave/containerizer/mesos/isolators/cgroups/cpushare.hpp"
 
+#include "slave/containerizer/mesos/isolators/cgroups/devices/hwloc/ProcessBinder.hpp"
+#include "slave/containerizer/mesos/isolators/cgroups/devices/hwloc/SubmodularScheduler.hpp"
+
 using namespace process;
 
 using std::list;
@@ -66,6 +69,22 @@ CgroupsCpushareIsolatorProcess::CgroupsCpushareIsolatorProcess(
 
 CgroupsCpushareIsolatorProcess::~CgroupsCpushareIsolatorProcess() {}
 
+
+Try<bool> CgroupsCpushareIsolatorProcess::pinCores(const Info* info) {
+  const Resources r = info->resources.get();
+  const double cpus = r.cpus().get();
+  const double gpus =  r.gpus().get();
+  const pid_t pid = info->pid.get();
+
+  return pin_executor_cpu(coreManager, pid, info->cgroup, cpus, gpus);
+}
+
+Try<bool> CgroupsCpushareIsolatorProcess::unpinCores(const Info* info) {
+  const Resources r = info->resources.get();
+  const pid_t pid = info->pid.get();
+
+  return unpin_executor_cpu(coreManager, pid);
+}
 
 Try<Isolator*> CgroupsCpushareIsolatorProcess::create(const Flags& flags)
 {
@@ -324,6 +343,8 @@ Future<Nothing> CgroupsCpushareIsolatorProcess::isolate(
     }
   }
 
+  pinCores(info);
+
   return Nothing();
 }
 
@@ -532,6 +553,8 @@ Future<Nothing> CgroupsCpushareIsolatorProcess::cleanup(
         info->cgroup,
         cgroups::DESTROY_TIMEOUT));
   }
+
+  unpinCores(info);
 
   return collect(futures)
     .onAny(defer(PID<CgroupsCpushareIsolatorProcess>(this),
