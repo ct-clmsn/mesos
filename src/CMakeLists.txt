@@ -138,6 +138,7 @@ set(LINUX_SRC
   linux/systemd.cpp
   slave/containerizer/mesos/linux_launcher.cpp
   slave/containerizer/mesos/isolators/cgroups/cpushare.cpp
+  slave/containerizer/mesos/isolators/cgroups/devices/hwloc/hwloc.cpp
   slave/containerizer/mesos/isolators/cgroups/mem.cpp
   slave/containerizer/mesos/isolators/cgroups/net_cls.cpp
   slave/containerizer/mesos/isolators/cgroups/perf_event.cpp

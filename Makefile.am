@@ -15,6 +15,7 @@
 # limitations under the License
 
 ACLOCAL_AMFLAGS = -I m4
+#ACLOCAL_AMFLAGS = ${ACLOCAL_FLAGS} -I m4
 
 AUTOMAKE_OPTIONS = foreign
 
@@ -26,9 +27,6 @@ PHONY_TARGETS =
 
 pkgconfigdir = $(libdir)/pkgconfig
 pkgconfig_DATA = mesos.pc
-
-# Directories to optionally install test binaries and libraries.
-testlibexecdir = $(pkglibexecdir)/tests
 
 # Since we generate several files in src/ with config.status, make
 # sure they're regenerated before we recurse into the src directory.
@@ -76,7 +74,7 @@ endif
 # (requires Automake >= 1.13) to define 'bench' as a recursive target
 # when we have benchmark tests in multiple subdirs.
 bench: all
-	@cd 3rdparty && $(MAKE) $(AM_MAKEFLAGS) libgmock.la
+	@cd 3rdparty/libprocess/3rdparty && $(MAKE) $(AM_MAKEFLAGS) libgmock.la
 	@cd src && MESOS_BENCHMARK=1 $(MAKE) $(AM_MAKEFLAGS) check
 
 PHONY_TARGETS += bench
@@ -91,15 +89,6 @@ tests: all
 # http://lists.gnu.org/archive/html/automake-commit/2008-11/msg00015.html.
 distclean-local:
 	-rm -f config.lt
-	-rm -f ./3rdparty/report.xml
-	-rm -f ./3rdparty/libprocess/report.xml
-	-rm -f ./3rdparty/stout/report.xml
-	-rm -f ./src/report.xml
 
-if INSTALL_TESTS
-dist_testlibexec_SCRIPTS = 				\
-  support/atexit.sh 					\
-  support/colors.sh
-endif
 
 .PHONY: $(PHONY_TARGETS)

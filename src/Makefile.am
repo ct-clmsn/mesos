@@ -21,6 +21,7 @@ AUTOMAKE_OPTIONS = subdir-objects
 MESOS_BUILD_DIR=@abs_top_builddir@
 
 include ../3rdparty/versions.am
+include ../3rdparty/libprocess/3rdparty/versions.am
 
 # TODO(charles): Move these into an included automakefile and have
 # them include $(top_builddir) as appropriate.
@@ -31,13 +32,13 @@ WHEEL = 3rdparty/wheel-$(WHEEL_VERSION)
 ZOOKEEPER = 3rdparty/zookeeper-$(ZOOKEEPER_VERSION)/src/c
 ZOOKEEPER_JAR = 3rdparty/zookeeper-$(ZOOKEEPER_VERSION)/zookeeper-$(ZOOKEEPER_VERSION).jar
 LIBPROCESS = 3rdparty/libprocess
-STOUT = 3rdparty/stout
-BOOST = 3rdparty/boost-$(BOOST_VERSION)
-GLOG = 3rdparty/glog-$(GLOG_VERSION)
-GMOCK = 3rdparty/gmock-$(GMOCK_VERSION)
+STOUT = $(LIBPROCESS)/3rdparty/stout
+BOOST = $(LIBPROCESS)/3rdparty/boost-$(BOOST_VERSION)
+GLOG = $(LIBPROCESS)/3rdparty/glog-$(GLOG_VERSION)
+GMOCK = $(LIBPROCESS)/3rdparty/gmock-$(GMOCK_VERSION)
 GTEST = $(GMOCK)/gtest
-PROTOBUF = 3rdparty/protobuf-$(PROTOBUF_VERSION)
-PICOJSON = 3rdparty/picojson-$(PICOJSON_VERSION)
+PROTOBUF = $(LIBPROCESS)/3rdparty/protobuf-$(PROTOBUF_VERSION)
+PICOJSON = $(LIBPROCESS)/3rdparty/picojson-$(PICOJSON_VERSION)
 
 
 # Unfortunatley, 'pkglibexecdir' and 'pkgsysconfdir' are not set
@@ -103,6 +104,8 @@ MESOS_CPPFLAGS += -DPKGLIBEXECDIR=\"$(pkglibexecdir)\"
 MESOS_CPPFLAGS += -DPKGDATADIR=\"$(pkgdatadir)\"
 MESOS_CPPFLAGS += -DPKGMODULEDIR=\"$(pkgmoduledir)\"
 MESOS_CPPFLAGS += -I$(top_srcdir)/include
+MESOS_CPPFLAGS += -I$(top_srcdir)/$(LIBPROCESS)/include
+MESOS_CPPFLAGS += -I$(top_srcdir)/$(STOUT)/include
 MESOS_CPPFLAGS += -I../include
 
 # Protobuf headers that depend on mesos.pb.h need this.
@@ -110,9 +113,11 @@ MESOS_CPPFLAGS += -I../include/mesos
 
 # Header only dependencies will be ignored for --disable-bundled.
 #
-# For non-convenience libraries we need to link them in to make the shared
-# library each time. (Currently, we don't support platforms where this is not
-# possible.)
+# We use "-isystem" instead of "-I" to add Boost to the include search
+# path. This disables compiler warnings inside Boost headers since we
+# can't easily fix them. See MESOS-3799.
+MESOS_CPPFLAGS += -isystem ../$(BOOST)
+MESOS_CPPFLAGS += -I../$(PICOJSON)
 
 # Enable the INT64 support for PicoJson.
 # NOTE: PicoJson requires __STDC_FORMAT_MACROS to be defined before importing
@@ -122,71 +127,25 @@ MESOS_CPPFLAGS += -I../include/mesos
 MESOS_CPPFLAGS += -DPICOJSON_USE_INT64
 MESOS_CPPFLAGS += -D__STDC_FORMAT_MACROS
 
-if WITH_BUNDLED_BOOST
-# We use "-isystem" instead of "-I" to add Boost to the include search
-# path. This disables compiler warnings inside Boost headers since we
-# can't easily fix them. See MESOS-3799.
-MESOS_CPPFLAGS += -isystem ../$(BOOST)
-endif
+MESOS_CPPFLAGS += -I../$(PROTOBUF)/src
+MESOS_CPPFLAGS += -I../$(GLOG)/src
 
 if WITH_BUNDLED_GLOG
 MESOS_CPPFLAGS += -I../$(GLOG)/src
-LIB_GLOG = ../$(GLOG)/libglog.la
-else
-LIB_GLOG = -lglog
-LDADD += -lglog
 endif
 
 if WITH_BUNDLED_LEVELDB
 MESOS_CPPFLAGS += -I../$(LEVELDB)/include
-
-# We need to directly include the leveldb library in order to avoid
-# the installed libmesos.la file to include leveldb in
-# 'dependency_libs' (via '-L../3rdparty/leveldb -lleveldb').
-
-LIB_LEVELDB = ../$(LEVELDB)/libleveldb.a
-else
-LIB_LEVELDB = -lleveldb
-LDADD += -lleveldb
-endif
-
-if WITH_BUNDLED_LIBPROCESS
-MESOS_CPPFLAGS += -I$(top_srcdir)/$(LIBPROCESS)/include
-LIB_PROCESS = ../$(LIBPROCESS)/libprocess.la
-else
-LIB_PROCESS = -lprocess
-endif
-
-if WITH_BUNDLED_PICOJSON
-MESOS_CPPFLAGS += -I../$(PICOJSON)
-endif
-
-if WITH_BUNDLED_PROTOBUF
-MESOS_CPPFLAGS += -I../$(PROTOBUF)/src
-LIB_PROTOBUF = ../$(PROTOBUF)/src/libprotobuf.la
-else
-LIB_PROTOBUF = -lprotobuf
-LDADD += -lprotobuf
-endif
-
-if WITH_BUNDLED_STOUT
-MESOS_CPPFLAGS += -I$(top_srcdir)/$(STOUT)/include
 endif
 
 if WITH_BUNDLED_ZOOKEEPER
 MESOS_CPPFLAGS += -I../$(ZOOKEEPER)/include
 MESOS_CPPFLAGS += -I../$(ZOOKEEPER)/generated
-LIB_ZOOKEEPER = ../$(ZOOKEEPER)/libzookeeper_mt.la
-else
-LIB_ZOOKEEPER = -lzookeeper_mt
-LDADD += -lzookeeper_mt
 endif
 
-if ENABLE_NVIDIA_GPU_SUPPORT
-LIB_NVIDIA = -lnvidia-ml
-LDADD += -lnvidia-ml
+if WITH_BUNDLED_PROTOBUF
+MESOS_CPPFLAGS += -I../$(PROTOBUF)/src
 endif
-
 
 # README: we build the Mesos library out of a collection of
 # convenience libraries (that is, libraries that do not get installed
@@ -941,6 +900,9 @@ MESOS_LINUX_FILES =							\
   linux/systemd.cpp							\
   slave/containerizer/mesos/linux_launcher.cpp				\
   slave/containerizer/mesos/isolators/cgroups/cpushare.cpp		\
+  slave/containerizer/mesos/isolators/cgroups/devices/hwloc/hwloc.cpp	\
+  slave/containerizer/mesos/isolators/cgroups/devices/hwloc/ProcessBinder.cpp	\
+  slave/containerizer/mesos/isolators/cgroups/devices/hwloc/SubmodularScheduler.cpp	\
   slave/containerizer/mesos/isolators/cgroups/mem.cpp			\
   slave/containerizer/mesos/isolators/cgroups/net_cls.cpp		\
   slave/containerizer/mesos/isolators/cgroups/perf_event.cpp		\
@@ -1181,15 +1143,51 @@ libmesos_la_LIBTOOLFLAGS = --tag=CXX
 # Add the convenience library.
 libmesos_la_LIBADD =							\
   libmesos_no_3rdparty.la						\
-  $(LIB_GLOG)								\
-  $(LIB_LEVELDB)							\
-  $(LIB_NVIDIA)								\
-  $(LIB_PROCESS)							\
-  $(LIB_PROTOBUF)							\
-  $(LIB_ZOOKEEPER)							\
   -lsvn_subr-1								\
   -lsvn_delta-1								\
   -lapr-1
+
+libmesos_la_LIBADD += ../$(LIBPROCESS)/libprocess.la
+
+# For non-convenience libraries we need to link them in to make the shared
+# library each time. (Currently, we don't support platforms where this is not
+# possible.)
+if WITH_BUNDLED_GLOG
+libmesos_la_LIBADD += ../$(GLOG)/libglog.la
+else
+libmesos_la_LIBADD += -lglog
+LDADD += -lglog
+endif
+
+if WITH_BUNDLED_LEVELDB
+# We need to directly include the leveldb library in order to avoid
+# the installed libmesos.la file to include leveldb in
+# 'dependency_libs' (via '-L../3rdparty/leveldb -lleveldb').
+
+libmesos_la_LIBADD += ../$(LEVELDB)/libleveldb.a
+else
+libmesos_la_LIBADD += -lleveldb
+LDADD += -lleveldb
+endif
+
+if WITH_BUNDLED_ZOOKEEPER
+libmesos_la_LIBADD += ../$(ZOOKEEPER)/libzookeeper_mt.la
+else
+libmesos_la_LIBADD += -lzookeeper_mt
+LDADD += -lzookeeper_mt
+endif
+
+if WITH_BUNDLED_PROTOBUF
+libmesos_la_LIBADD += ../$(PROTOBUF)/src/libprotobuf.la
+else
+libmesos_la_LIBADD += -lprotobuf
+LDADD += -lprotobuf
+endif
+
+if ENABLE_NVIDIA_GPU_SUPPORT
+libmesos_la_LIBADD += -lnvidia-ml
+LDADD += -lnvidia-ml
+endif
 
 
 # Binaries.
@@ -1834,6 +1832,7 @@ MESOS_TEST_MODULE_LDFLAGS = $(MESOS_MODULE_LDFLAGS)
 # When we use the 'noinst_' prefix to ensure these libraries are not
 # installed, automake skips building the shared libraries. The workaround is
 # to use '-rpath /nowhere' to force libtool to always build shared libraries.
+
 if !INSTALL_TESTS
 MESOS_TEST_MODULE_LDFLAGS += -rpath /nowhere
 endif
@@ -2035,15 +2034,15 @@ mesos_tests_CPPFLAGS += -I../$(GMOCK)/include
 mesos_tests_CPPFLAGS += -DTESTLIBEXECDIR=\"$(testlibexecdir)\"
 mesos_tests_CPPFLAGS += -DSBINDIR=\"$(sbindir)\"
 
-mesos_tests_LDADD = ../3rdparty/libgmock.la libmesos.la $(LDADD)
+mesos_tests_LDADD = ../$(LIBPROCESS)/3rdparty/libgmock.la libmesos.la $(LDADD)
 
 if !OS_FREEBSD
   mesos_tests_LDADD += -ldl # FreeBSD includes dynamic lib utils in libc.
 endif
 
-mesos_tests_DEPENDENCIES =					\
-  ../3rdparty/libgmock.la					\
-  libmesos.la							\
+mesos_tests_DEPENDENCIES = 					\
+  ../$(LIBPROCESS)/3rdparty/libgmock.la 			\
+  libmesos.la 							\
   $(MESOS_TEST_MODULES)
 
 if OS_LINUX
@@ -2130,8 +2129,8 @@ dist_check_SCRIPTS +=						\
   tests/python_framework_test.sh				\
   tests/test_framework_test.sh
 
-../3rdparty/libgmock.la:
-	@cd ../3rdparty && $(MAKE) $(AM_MAKEFLAGS) libgmock.la
+../$(LIBPROCESS)/3rdparty/libgmock.la:
+	@cd ../$(LIBPROCESS)/3rdparty && $(MAKE) $(AM_MAKEFLAGS) libgmock.la
 
 if INSTALL_TESTS
 testlibexec_PROGRAMS = $(check_PROGRAMS)
@@ -2158,8 +2157,8 @@ endif
 copy-template-and-create-symlink:
 	cp $(DESTDIR)/$(pkgsysconfdir)/mesos-agent-env.sh.template \
 	  $(DESTDIR)/$(pkgsysconfdir)/mesos-slave-env.sh.template &&\
-	cd $(DESTDIR)/$(includedir)/mesos && \
-	ln -sf agent slave
+	ln -s $(DESTDIR)/$(includedir)/mesos/agent \
+	  $(DESTDIR)/$(includedir)/mesos/slave
 
 # Install compatibility symlinks for modules that used to be in $(LIBDIR)
 # but are now in $(PKGMODULEDIR). We use install-data-hook because it
